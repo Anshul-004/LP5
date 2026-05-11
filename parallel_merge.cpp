@@ -1,12 +1,12 @@
 #include <iostream>
 #include <vector>
 #include <omp.h>
+
 using namespace std;
 
 // Merge Function
 void merge(vector<int> &arr, int left, int mid, int right)
 {
-
     vector<int> temp(right - left + 1);
 
     int i = left;
@@ -15,10 +15,8 @@ void merge(vector<int> &arr, int left, int mid, int right)
 
     while (i <= mid && j <= right)
     {
-
-        if (arr[i] < arr[j])
+        if (arr[i] <= arr[j])
             temp[k++] = arr[i++];
-
         else
             temp[k++] = arr[j++];
     }
@@ -33,35 +31,62 @@ void merge(vector<int> &arr, int left, int mid, int right)
         arr[i] = temp[i - left];
 }
 
-// Parallel Merge Sort
-void parallel_merge_sort(vector<int> &arr, int left, int right)
+// Sequential Merge Sort
+void sequential_merge_sort(vector<int> &arr, int left, int right)
 {
-
     if (left >= right)
         return;
 
-    int mid = (left + right) / 2;
+    int mid = left + (right - left) / 2;
 
-#pragma omp parallel sections
+    sequential_merge_sort(arr, left, mid);
+    sequential_merge_sort(arr, mid + 1, right);
+
+    merge(arr, left, mid, right);
+}
+
+// Parallel Merge Sort
+void parallel_merge_sort(vector<int> &arr, int left, int right, int depth = 0)
+{
+    if (left >= right)
+        return;
+
+    int mid = left + (right - left) / 2;
+
+    // Limit recursion depth to avoid too many threads
+    if (depth <= 4)
     {
+#pragma omp parallel sections
+        {
+#pragma omp section
+            {
+                parallel_merge_sort(arr, left, mid, depth + 1);
+            }
 
 #pragma omp section
-        {
-            parallel_merge_sort(arr, left, mid);
+            {
+                parallel_merge_sort(arr, mid + 1, right, depth + 1);
+            }
         }
-
-#pragma omp section
-        {
-            parallel_merge_sort(arr, mid + 1, right);
-        }
+    }
+    else
+    {
+        sequential_merge_sort(arr, left, mid);
+        sequential_merge_sort(arr, mid + 1, right);
     }
 
     merge(arr, left, mid, right);
 }
 
+void printArray(const vector<int> &arr)
+{
+    for (int x : arr)
+        cout << x << " ";
+    cout << endl;
+}
+
 int main()
 {
-
     int n;
 
     cout << "Enter number of elements: ";
@@ -70,18 +95,42 @@ int main()
     vector<int> arr(n);
 
     cout << "Enter elements: ";
-
     for (int i = 0; i < n; i++)
         cin >> arr[i];
 
-    parallel_merge_sort(arr, 0, n - 1);
+    // Create copies for both sorting methods
+    vector<int> seqArr = arr;
+    vector<int> parArr = arr;
 
-    cout << "Sorted Array: ";
+    // Sequential Merge Sort Timing
+    double start_seq = omp_get_wtime();
 
-    for (int x : arr)
-        cout << x << " ";
+    sequential_merge_sort(seqArr, 0, n - 1);
 
-    cout << endl;
+    double end_seq = omp_get_wtime();
+
+    // Parallel Merge Sort Timing
+    double start_par = omp_get_wtime();
+
+    parallel_merge_sort(parArr, 0, n - 1);
+
+    double end_par = omp_get_wtime();
+
+    // Output Sequential Result
+    cout << "\nSequential Merge Sort Result:\n";
+    printArray(seqArr);
+
+    // Output Parallel Result
+    cout << "\nParallel Merge Sort Result:\n";
+    printArray(parArr);
+
+    // Print Execution Times
+    cout << "\nExecution Time:\n";
+    cout << "Sequential Merge Sort Time: "
+         << (end_seq - start_seq) << " seconds\n";
+
+    cout << "Parallel Merge Sort Time: "
+         << (end_par - start_par) << " seconds\n";
 
     return 0;
 }
