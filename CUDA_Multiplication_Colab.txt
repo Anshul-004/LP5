@@ -1,3 +1,162 @@
 !nvidia-smi
 
 #Keep Whole Cpp Code in one block
+%%writefile matrix_multiplication.cu
+
+#include <iostream>
+using namespace std;
+
+// CUDA Kernel for Matrix Multiplication
+__global__ void matrixMultiplication(
+    int *A,
+    int *B,
+    int *C,
+    int rowsA,
+    int colsA,
+    int colsB
+)
+{
+    int row =
+        blockIdx.y * blockDim.y
+        + threadIdx.y;
+
+    int col =
+        blockIdx.x * blockDim.x
+        + threadIdx.x;
+
+    if(row < rowsA && col < colsB)
+    {
+        int sum = 0;
+
+        for(int k = 0; k < colsA; k++)
+        {
+            sum +=
+                A[row * colsA + k] *
+                B[k * colsB + col];
+        }
+
+        C[row * colsB + col] = sum;
+    }
+}
+
+int main()
+{
+    int rowsA, colsA, rowsB, colsB;
+
+    cout << "Enter rows and columns of Matrix A: ";
+    cin >> rowsA >> colsA;
+
+    cout << "Enter rows and columns of Matrix B: ";
+    cin >> rowsB >> colsB;
+
+    // Check multiplication condition
+    if(colsA != rowsB)
+    {
+        cout << "Matrix multiplication not possible!\n";
+        return 0;
+    }
+
+    int sizeA = rowsA * colsA;
+    int sizeB = rowsB * colsB;
+    int sizeC = rowsA * colsB;
+
+    // Host matrices
+    int *h_A = new int[sizeA];
+    int *h_B = new int[sizeB];
+    int *h_C = new int[sizeC];
+
+    // Input Matrix A
+    cout << "Enter elements of Matrix A:\n";
+
+    for(int i = 0; i < sizeA; i++)
+    {
+        cin >> h_A[i];
+    }
+
+    // Input Matrix B
+    cout << "Enter elements of Matrix B:\n";
+
+    for(int i = 0; i < sizeB; i++)
+    {
+        cin >> h_B[i];
+    }
+
+    // Device matrices
+    int *d_A, *d_B, *d_C;
+
+    cudaMalloc(&d_A, sizeA * sizeof(int));
+    cudaMalloc(&d_B, sizeB * sizeof(int));
+    cudaMalloc(&d_C, sizeC * sizeof(int));
+
+    // Copy data from Host to Device
+    cudaMemcpy(
+        d_A,
+        h_A,
+        sizeA * sizeof(int),
+        cudaMemcpyHostToDevice
+    );
+
+    cudaMemcpy(
+        d_B,
+        h_B,
+        sizeB * sizeof(int),
+        cudaMemcpyHostToDevice
+    );
+
+    // Define block and grid size
+    dim3 threadsPerBlock(16, 16);
+
+    dim3 blocksPerGrid(
+        (colsB + 15) / 16,
+        (rowsA + 15) / 16
+    );
+
+    // Launch Kernel
+    matrixMultiplication<<<blocksPerGrid, threadsPerBlock>>>(
+        d_A,
+        d_B,
+        d_C,
+        rowsA,
+        colsA,
+        colsB
+    );
+
+    // Copy result back to Host
+    cudaMemcpy(
+        h_C,
+        d_C,
+        sizeC * sizeof(int),
+        cudaMemcpyDeviceToHost
+    );
+
+    // Display Result Matrix
+    cout << "\nResultant Matrix:\n";
+
+    for(int i = 0; i < rowsA; i++)
+    {
+        for(int j = 0; j < colsB; j++)
+        {
+            cout << h_C[i * colsB + j] << " ";
+        }
+
+        cout << endl;
+    }
+
+    // Free memory
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+
+    delete[] h_A;
+    delete[] h_B;
+    delete[] h_C;
+
+    return 0;
+}
+
+
+#To compile
+!nvcc matrix_multiplication.cu -o matrix_multiplication
+
+#To Run
+!./matrix_multiplication
