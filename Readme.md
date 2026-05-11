@@ -1,6 +1,8 @@
-Creating venv \n
-python -m venv .venv \n
-source .venv/bin/activate \n
+Creating venv : 
+
+python -m venv .venv 
+
+source .venv/bin/activate 
 
 
 FOR CPP CODES WITH OPENMP: 
